@@ -13,22 +13,24 @@ $income_controller = new IncomeController();
 $expense_controller = new ExpenseController();
 $user_controller = new UserController();
 
-// Get date range (default: current month)
+// Get date range for charts + recent transactions (current month)
 $date_range = getDateRange('month');
 $start_date = $date_range['start'];
 $end_date = $date_range['end'];
 
-// Get statistics
-$stats = $user_controller->getUserStatistics($user_id);
-$total_income = $income_controller->getTotalIncome($user_id, $start_date, $end_date);
-$total_expenses = $expense_controller->getTotalExpenses($user_id, $start_date, $end_date);
+// REAL all-time totals
+$total_income = $income_controller->getTotalIncome($user_id);
+$total_expenses = $expense_controller->getTotalExpenses($user_id);
 $monthly_savings = $total_income - $total_expenses;
 
-// Get chart data
+// All-time balance (already correct)
+$stats = $user_controller->getUserStatistics($user_id);
+
+// Charts (monthly)
 $expense_by_category = $expense_controller->getExpensesByCategoryForChart($user_id, $start_date, $end_date);
 $income_by_category = $income_controller->getIncomeByCategoryForChart($user_id, $start_date, $end_date);
 
-// Get recent transactions
+// Recent transactions (monthly)
 $recent_income = $income_controller->getIncome($user_id, ['start_date' => $start_date, 'end_date' => $end_date]);
 $recent_expenses = $expense_controller->getExpenses($user_id, ['start_date' => $start_date, 'end_date' => $end_date]);
 
@@ -60,7 +62,7 @@ foreach ($income_by_category as $index => $item) {
                 <h1 class="page-title">
                     <i class="fas fa-chart-line"></i> Dashboard
                 </h1>
-                <p class="text-muted">Welcome back, <?php echo htmlspecialchars($_SESSION['user_name']); ?>!</p>
+                <p class="text-muted">well come back agian , <?php echo htmlspecialchars($_SESSION['user_name']); ?>!</p>
             </div>
 
             <!-- Flash Message -->
@@ -84,9 +86,9 @@ foreach ($income_by_category as $index => $item) {
                             <i class="fas fa-arrow-up"></i>
                         </div>
                         <div class="card-content">
-                            <h6 class="card-title">Total Income</h6>
+                            <h6 class="card-title">Total incomes</h6>
                             <h3 class="card-value"><?php echo formatCurrency($total_income); ?></h3>
-                            <p class="card-subtitle">This month</p>
+                            <p class="card-subtitle">All time</p>
                         </div>
                     </div>
                 </div>
@@ -97,9 +99,9 @@ foreach ($income_by_category as $index => $item) {
                             <i class="fas fa-arrow-down"></i>
                         </div>
                         <div class="card-content">
-                            <h6 class="card-title">Total Expenses</h6>
+                            <h6 class="card-title">Total expenses</h6>
                             <h3 class="card-value"><?php echo formatCurrency($total_expenses); ?></h3>
-                            <p class="card-subtitle">This month</p>
+                            <p class="card-subtitle">All time</p>
                         </div>
                     </div>
                 </div>
@@ -110,9 +112,9 @@ foreach ($income_by_category as $index => $item) {
                             <i class="fas fa-piggy-bank"></i>
                         </div>
                         <div class="card-content">
-                            <h6 class="card-title">Savings</h6>
+                            <h6 class="card-title">Net Savings</h6>
                             <h3 class="card-value"><?php echo formatCurrency($monthly_savings); ?></h3>
-                            <p class="card-subtitle">This month</p>
+                            <p class="card-subtitle">All time</p>
                         </div>
                     </div>
                 </div>
@@ -136,7 +138,7 @@ foreach ($income_by_category as $index => $item) {
                 <div class="col-lg-6 mb-4">
                     <div class="card chart-card">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-pie-chart"></i> Expenses by Category</h5>
+                            <h5 class="mb-0"><i class="fas fa-pie-chart"></i> Expenses by Category (This Month)</h5>
                         </div>
                         <div class="card-body">
                             <canvas id="expenseChart"></canvas>
@@ -147,7 +149,7 @@ foreach ($income_by_category as $index => $item) {
                 <div class="col-lg-6 mb-4">
                     <div class="card chart-card">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-pie-chart"></i> Income by Category</h5>
+                            <h5 class="mb-0"><i class="fas fa-pie-chart"></i> Income by Category (This Month)</h5>
                         </div>
                         <div class="card-body">
                             <canvas id="incomeChart"></canvas>
@@ -161,7 +163,7 @@ foreach ($income_by_category as $index => $item) {
                 <div class="col-lg-8 mb-4">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-list"></i> Recent Transactions</h5>
+                            <h5 class="mb-0"><i class="fas fa-list"></i> Recent Transactions (This Month)</h5>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -177,18 +179,15 @@ foreach ($income_by_category as $index => $item) {
                                     </thead>
                                     <tbody>
                                         <?php
-                                        // Add type to each transaction
                                         foreach ($recent_expenses as &$exp) {
                                             $exp['type'] = 'expense';
                                         }
                                         foreach ($recent_income as &$inc) {
                                             $inc['type'] = 'income';
                                         }
-                                        
+
                                         $transactions = array_merge($recent_expenses, $recent_income);
-                                        usort($transactions, function($a, $b) {
-                                            return strtotime($b['date']) - strtotime($a['date']);
-                                        });
+                                        usort($transactions, fn($a, $b) => strtotime($b['date']) - strtotime($a['date']));
                                         $transactions = array_slice($transactions, 0, 8);
 
                                         if (empty($transactions)):
@@ -207,17 +206,14 @@ foreach ($income_by_category as $index => $item) {
                                                 <td><small><?php echo htmlspecialchars($trans['category_name'] ?? 'N/A'); ?></small></td>
                                                 <td><strong><?php echo formatCurrency($trans['amount']); ?></strong></td>
                                                 <td>
-                                                    <?php if (($trans['type'] ?? 'expense') === 'income'): ?>
+                                                    <?php if ($trans['type'] === 'income'): ?>
                                                         <span class="badge bg-success">Income</span>
                                                     <?php else: ?>
                                                         <span class="badge bg-danger">Expense</span>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
-                                        <?php
-                                            endforeach;
-                                        endif;
-                                        ?>
+                                        <?php endforeach; endif; ?>
                                     </tbody>
                                 </table>
                             </div>
@@ -272,21 +268,12 @@ if (expenseCtx && <?php echo json_encode($expense_amounts); ?>.length > 0) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        font: {
-                            size: 12
-                        }
-                    }
-                }
+                legend: { position: 'bottom' }
             }
         }
     });
-} else if (expenseCtx) {
+} else {
     expenseCtx.parentElement.innerHTML = '<div class="text-center text-muted py-4">No expense data available</div>';
 }
 
@@ -306,24 +293,14 @@ if (incomeCtx && <?php echo json_encode($income_amounts); ?>.length > 0) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        font: {
-                            size: 12
-                        }
-                    }
-                }
+                legend: { position: 'bottom' }
             }
         }
     });
-} else if (incomeCtx) {
+} else {
     incomeCtx.parentElement.innerHTML = '<div class="text-center text-muted py-4">No income data available</div>';
 }
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-
